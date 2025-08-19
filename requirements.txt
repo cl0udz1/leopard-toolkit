@@ -1,0 +1,5 @@
+scapy
+requests
+customtkinter
+beautifulsoup4
+pyinstaller

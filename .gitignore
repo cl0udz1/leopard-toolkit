@@ -1,0 +1,18 @@
+# Python virtual environment
+venv/
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# Log files
+logs/
+
+# Distribution folder (where the .exe is created)
+dist/
+
+# Build folder (temporary files from PyInstaller)
+build/
+
+# PyInstaller spec file
+*.spec
