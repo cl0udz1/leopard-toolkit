@@ -31,19 +31,27 @@ def scan_wifi(log):
 
 def crawl_website(log, base_url, max_depth=2):
     """Crawls a website to find internal links up to a specific depth."""
+    # Sanitize the initial URL input
+    base_url = base_url.strip()
+    
     print(f"[*] Starting web crawl on {base_url} (depth: {max_depth})...")
     log.info(f"Starting web crawl on {base_url} with depth {max_depth}")
     if not base_url.startswith(('http://', 'https://')):
         base_url = 'http://' + base_url
     
     try:
+        # Use the initial URL to determine the home domain
         domain_name = urlparse(base_url).hostname
+        if not domain_name:
+            print(f"[!] Invalid URL: Could not determine hostname from '{base_url}'")
+            return
+
         visited = set()
         to_visit = queue.Queue()
         to_visit.put((base_url, 0))
 
         with requests.Session() as session:
-            session.headers.update({'User-Agent': 'Leopard-Crawler/2.1'})
+            session.headers.update({'User-Agent': 'Leopard-Crawler/2.2'})
             while not to_visit.empty() and len(visited) < 500: # Overall limit
                 current_url, current_depth = to_visit.get()
 
@@ -56,13 +64,28 @@ def crawl_website(log, base_url, max_depth=2):
                 try:
                     response = session.get(current_url, timeout=5, allow_redirects=True)
                     response.raise_for_status()
+
+                    # Check if the content is HTML before trying to parse
+                    if 'text/html' not in response.headers.get('Content-Type', ''):
+                        continue
+
                     soup = BeautifulSoup(response.text, 'html.parser')
                     for link in soup.find_all('a', href=True):
-                        full_url = urljoin(base_url, link['href'])
+                        href = link['href']
+                        if not href or href.startswith('#') or href.startswith('mailto:'):
+                            continue
+
+                        # **BUG FIX**: Use the current_url as the base for resolving relative links
+                        full_url = urljoin(current_url, href)
+                        
+                        # Clean up the URL (remove fragments)
+                        full_url = urlparse(full_url)._replace(fragment="").geturl()
+
                         if urlparse(full_url).hostname == domain_name and full_url not in visited:
                             to_visit.put((full_url, current_depth + 1))
                 except requests.RequestException as e:
                     print(f"  [!] Could not fetch {current_url}: {e}")
         print(f"\n[+] Crawl finished. Discovered {len(visited)} unique links.")
     except Exception as e:
-        print(f"[!] An error occurred during the web crawl: {e}")
+        # Catching broad exceptions is okay here as a last resort for unexpected errors
+        print(f"[!] An unexpected error occurred during the web crawl: {e}")
